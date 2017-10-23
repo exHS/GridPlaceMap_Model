@@ -22,11 +22,12 @@ classdef HPC < handle
         % set stripe cell tuning
         SIGMA_RING = 5;
         % direction
-        DIRECTION = 45;
-        % number of phases to calculate for each ring attractor 
-        NUMBER_PHASES = 360;
-        % ~2 * distance between two activity peaks
-        SCALE = 360;
+        DIRECTIONS = [10:10:180];
+        % number of phases to calculate for each ring attractor
+        %         PHASES = [0,1/5,2/5,3/5,4/5]
+        PHASES = [0:1/360:1]
+        % distance between two activity peaks
+        SCALES = [20,35,50];
         % Velocity , basically depending on Environment
         VELOCITY = 6.25;
         
@@ -66,7 +67,7 @@ classdef HPC < handle
         
         %%% Testing grid cell model %%%
         % value Dd of equation 2 (we have D_d value for each degree -> 360)
-        D_d = zeros(360,1)
+        direction_displacement = zeros(18,1)
         
         % store value of a singel stripe cell
         single_stripe = [];
@@ -169,22 +170,39 @@ classdef HPC < handle
             % calculate displacement for one specific direction
             % needs needs to be done for every direction?
             
-            % equation 1 from paper
-            v_d = cos(obj.DIRECTION-obj.hd)* obj.VELOCITY;
-            % equation 2 from paper
-            obj.D_d(1) = obj.D_d(1) + v_d;
-            
-            % walk over all phases of the model ->360
-            for i=1:obj.NUMBER_PHASES
-                % equation 3 from paper
-                omega_dps = mod((obj.D_d(1) - i) , obj.SCALE);
-                % equation 4 from paper
-                obj.stripeCells(i) = exp( - (min(omega_dps,obj.SCALE-omega_dps)^2 / (2*obj.SIGMA_RING^2)) );
+            for direction_index=1:length(obj.DIRECTIONS)
+                direction = obj.DIRECTIONS(direction_index);
+                % equation 1 from paper
+                v_d = cos(direction-obj.hd); %*obj.VELOCITY;
+                % equation 2 from paper
+                obj.direction_displacement(direction_index) = obj.direction_displacement(direction_index) + v_d;
+                
+                for scale_index=1:length(obj.SCALES)
+                    scale = obj.SCALES(scale_index);
+                    for phase_index= 1:length(obj.PHASES)
+                        phase = obj.PHASES(phase_index);
+                        % correct phase
+                        phase = phase * scale;
+                        
+                        % equation 3 from paper
+                        omega_dps = mod((obj.direction_displacement(direction_index) - phase) , scale);
+                        % equation 4 from paper
+                        obj.stripeCells(scale_index,direction_index,phase_index) = exp( - (min(omega_dps,scale-omega_dps)^2 / (2*(scale*0.07)^2)) );
+                        
+                    end
+                    
+                end
                 
             end
             
             
+            %             [x,y] = meshgrid(1:length(obj.SCALES),1:length(obj.DIRECTIONS));
+            %             z = obj.stripeCells(:,:,1)';
+            %             subplot(5,4,[11 12 15 16 19 20])
+            %             pcolor(x,y,z);
+            %
             
+            obj.stripeCells = reshape(obj.stripeCells(1,3,:),1,[]);
             
             % Plot all Cell layers
             if obj.DEBUG_MODE
@@ -231,10 +249,10 @@ classdef HPC < handle
             ylabel('Ring Attractor Activity');
             xlabel('Phases (degree)');
             ylim([0 1]);
-            title(sprintf('Stripe Cell Population Activity for scale %i and direction %i', obj.SCALE,obj.DIRECTION));
-
+            title(sprintf('Stripe Cell Population Activity for scale %i and direction %i', obj.SCALES(1),obj.DIRECTIONS(3)));
+            
             hold off;
-          
+            
             
             
             

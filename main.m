@@ -7,7 +7,7 @@ RandStream.setGlobalStream(s);
 
 % size of the environment [x y]
 environmentSize = [500, 500];
-startPosition = [250 100];
+startPosition = [250 100];  
 
 circledEnvironment = true;
 
