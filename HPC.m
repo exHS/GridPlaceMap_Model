@@ -73,7 +73,9 @@ classdef HPC < handle
         single_stripe = [];
         
         % for plotting
-        figureStripeCells =[];
+        figureStripeCells1 =[];
+        figureStripeCells2 =[];
+        figureStripeCells3 =[];
     end
     
     
@@ -196,13 +198,11 @@ classdef HPC < handle
             end
             
             
-            %             [x,y] = meshgrid(1:length(obj.SCALES),1:length(obj.DIRECTIONS));
-            %             z = obj.stripeCells(:,:,1)';
-            %             subplot(5,4,[11 12 15 16 19 20])
-            %             pcolor(x,y,z);
+            
             %
             
-            obj.stripeCells = reshape(obj.stripeCells(1,3,:),1,[]);
+            % only show selected stripe cells 
+%             obj.stripeCells = reshape(obj.stripeCells(1,3,:),1,[]);
             
             % Plot all Cell layers
             if obj.DEBUG_MODE
@@ -226,31 +226,75 @@ classdef HPC < handle
         function initializePlotCells(obj)
             
             
+%             hold on;
+%             
+%             subplot(5,4,[11 12 15 16 19 20])
+%             obj.figureStripeCells = plot([1:length(obj.stripeCells)],obj.stripeCells, 'r');
+%             
+%             obj.figureStripeCells.XDataSource = 'X_STRIPES';
+%             obj.figureStripeCells.YDataSource = 'Y_STRIPES';
+%             
+%             sNeg = {sprintf('0%c', char(176))};
+%             sNeg= [sNeg,sprintf('60%c', char(176))];
+%             sNeg= [sNeg,sprintf('120%c', char(176))];
+%             sNeg= [sNeg,sprintf('180%c', char(176))];
+%             sNeg= [sNeg,sprintf('240%c', char(176))];
+%             sNeg= [sNeg,sprintf('300%c', char(176))];
+%             sNeg= [sNeg,sprintf('360%c', char(176))];
+%             set(gca,'FontSize',13,'FontWeight','bold');
+%             
+%             set(gca,'XTickLabel',sNeg);
+%             set(gca,'XTick',[0,60,120,180,240,300,360]);
+%             set(gca,'YTickLabel',[]);
+%             ylabel('Ring Attractor Activity');
+%             xlabel('Phases (degree)');
+%             ylim([0 1]);
+%             title(sprintf('Stripe Cell Population Activity for scale %i and direction %i', obj.SCALES(1),obj.DIRECTIONS(3)));
+%             
+%             hold off;
+
             hold on;
             
-            subplot(5,4,[11 12 15 16 19 20])
-            obj.figureStripeCells = plot([1:length(obj.stripeCells)],obj.stripeCells, 'r');
-            
-            obj.figureStripeCells.XDataSource = 'X_STRIPES';
-            obj.figureStripeCells.YDataSource = 'Y_STRIPES';
-            
-            sNeg = {sprintf('0%c', char(176))};
-            sNeg= [sNeg,sprintf('60%c', char(176))];
-            sNeg= [sNeg,sprintf('120%c', char(176))];
-            sNeg= [sNeg,sprintf('180%c', char(176))];
-            sNeg= [sNeg,sprintf('240%c', char(176))];
-            sNeg= [sNeg,sprintf('300%c', char(176))];
-            sNeg= [sNeg,sprintf('360%c', char(176))];
-            set(gca,'FontSize',13,'FontWeight','bold');
-            
-            set(gca,'XTickLabel',sNeg);
+            subplot(5,4,[11 12])
+           [x,y] = meshgrid(1:length(obj.PHASES),1:length(obj.DIRECTIONS));
+            z = obj.stripeCells(1,:,:);
+            z = squeeze(permute(z,[2,1,3]));
+            obj.figureStripeCells1  = pcolor(x,y,z);
+            set(gca,'FontSize',10,'FontWeight','bold');
             set(gca,'XTick',[0,60,120,180,240,300,360]);
-            set(gca,'YTickLabel',[]);
-            ylabel('Ring Attractor Activity');
-            xlabel('Phases (degree)');
-            ylim([0 1]);
-            title(sprintf('Stripe Cell Population Activity for scale %i and direction %i', obj.SCALES(1),obj.DIRECTIONS(3)));
+            set(gca,'YTick',obj.DIRECTIONS(1:2:end)/10);
+            set(gca,'YTickLabel',obj.DIRECTIONS(1:2:end));
+            ylabel('Tuned Diretions');
+            title(sprintf('Stripe Cell Population Activity for scale %i ', obj.SCALES(1)));
+            hold off;
             
+            hold on;
+            subplot(5,4,[15 16 ])
+           [x,y] = meshgrid(1:length(obj.PHASES),1:length(obj.DIRECTIONS));
+            z = obj.stripeCells(1,:,:);
+            z = squeeze(permute(z,[2,1,3]));
+            obj.figureStripeCells2  = pcolor(x,y,z);
+            set(gca,'FontSize',10,'FontWeight','bold');
+            set(gca,'XTick',[0,60,120,180,240,300,360]);
+            set(gca,'YTick',obj.DIRECTIONS(1:2:end)/10);
+            set(gca,'YTickLabel',obj.DIRECTIONS(1:2:end));
+            ylabel('Tuned Diretions');
+            title(sprintf('Stripe Cell Population Activity for scale %i', obj.SCALES(2)));
+            hold off;
+            
+            hold on;
+            subplot(5,4,[19 20 ])
+           [x,y] = meshgrid(1:length(obj.PHASES),1:length(obj.DIRECTIONS));
+            z = obj.stripeCells(1,:,:);
+            z = squeeze(permute(z,[2,1,3]));
+            obj.figureStripeCells3  = pcolor(x,y,z);
+            set(gca,'FontSize',10,'FontWeight','bold');
+            set(gca,'XTick',[0,60,120,180,240,300,360]);
+            set(gca,'YTick',obj.DIRECTIONS(1:2:end)/10);
+            set(gca,'YTickLabel',obj.DIRECTIONS(1:2:end));
+            ylabel('Tuned Diretions');
+            xlabel('Phases (degree)');
+            title(sprintf('Stripe Cell Population Activity for scale %i i', obj.SCALES(3)));
             hold off;
             
             
@@ -260,10 +304,21 @@ classdef HPC < handle
         
         function updatePlotCells(obj)
             % This function updates the plot
-            X_STRIPES = [1:length(obj.stripeCells)];
-            Y_STRIPES = obj.stripeCells;
+            z = obj.stripeCells(1,:,:);
+            z = squeeze(permute(z,[2,1,3]));
+            set(obj.figureStripeCells1, 'CData', z); 
             
-            refreshdata(obj.figureStripeCells,'caller');
+            z = obj.stripeCells(2,:,:);
+            z = squeeze(permute(z,[2,1,3]));
+            set(obj.figureStripeCells2, 'CData', z); 
+            
+            z = obj.stripeCells(3,:,:);
+            z = squeeze(permute(z,[2,1,3]));
+            set(obj.figureStripeCells3, 'CData', z); 
+            
+            refreshdata(obj.figureStripeCells1,'caller');
+            refreshdata(obj.figureStripeCells2,'caller');
+            refreshdata(obj.figureStripeCells3,'caller');
         end
         
     end

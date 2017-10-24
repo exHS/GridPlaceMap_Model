@@ -188,18 +188,18 @@ classdef Agent<handle
             
             
             % set movement of agent manually
-%             if obj.currentTime < 1.0
-%                 
-%                 movement = [0.4 0.5];
-%                 
-%             elseif obj.currentTime < 30
-%                 movement = [0.5 0.5];
-%             elseif obj.currentTime < 34
-%                 movement = [0.1 0.5];
-%             else
-%                 movement = [0.5 0.5]
-% 
-%             end
+            if obj.currentTime < 1.0
+                
+                movement = [0.5 0.5];
+                
+            elseif obj.currentTime < 30
+                movement = [0.5 0.5];
+            elseif obj.currentTime < 34
+                movement = [0.1 0.5];
+            else
+                movement = obj.movement;
+
+            end
             
             
             % return also current orientation
