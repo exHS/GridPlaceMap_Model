@@ -54,9 +54,9 @@ classdef Agent<handle
         % allocentric HD of the agent in degrees
         hdAgent = 0;
         
-        % the velocity of the agent
-        velocity = 5;
-        
+        % velocity of the agent, important for stripe cells (default 10)
+        agentVelocity = 10;
+
         % the path that the agent has travelled so far (used for path integration). TODO Maybe just
         % store movements?
         pathTravelled = [];
@@ -107,7 +107,7 @@ classdef Agent<handle
     
     methods(Access=public)
         
-        function obj = Agent(startPosition,goal,cues)
+        function obj = Agent(startPosition,agentVelocity, goal,cues)
             % Constructor for the class Agent. It receives the startPosition as a parameter
             
             obj.currentTime = 0.0;
@@ -117,13 +117,14 @@ classdef Agent<handle
             obj.position = startPosition;
             obj.pathTravelled = startPosition;
             
+            obj.agentVelocity = agentVelocity;
             obj.hdAgent = obj.updateHD();
             
             obj.cues = cues;
             obj.goal = goal;
             
             % create the brain areas on start up
-            obj.hpc = HPC(obj.N,obj.SIGMA);
+            obj.hpc = HPC(obj.N,obj.SIGMA,obj.agentVelocity);
             obj.rsc = RSC(obj.N,obj.SIGMA);
             obj.ppc = PPC(obj.N,obj.SIGMA);
             
@@ -186,20 +187,19 @@ classdef Agent<handle
             % Use velocity to get actual movement commands
             movement = obj.movement;
             
-            
             % set movement of agent manually
-            if obj.currentTime < 1.0
-                
-                movement = [0.5 0.5];
-                
-            elseif obj.currentTime < 30
-                movement = [0.5 0.5];
-            elseif obj.currentTime < 34
-                movement = [0.1 0.5];
-            else
-                movement = obj.movement;
-
-            end
+%             if obj.currentTime < 1.0
+%                 
+%                 movement = [0.5 0.5];
+%                 
+%             elseif obj.currentTime < 30
+%                 movement = [0.5 0.5];
+%             elseif obj.currentTime < 34
+%                 movement = [0.1 0.5];
+%             else
+%                 movement = obj.movement;
+% 
+%             end
             
             
             % return also current orientation

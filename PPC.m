@@ -19,7 +19,7 @@ classdef PPC < handle
         DELTA_T = 0.25;
         
         % DEBUG MOD
-        DEBUG_MODE = 1;
+        DEBUG_MODE = 0;
         
         % movementCell connection area in percent (defines how many EGD cells should
         % be connected to left resp. right movement cells)

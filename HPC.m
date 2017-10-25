@@ -8,28 +8,31 @@ classdef HPC < handle
     %
     properties (Access=private, Constant=true)
         
-        % DEBUG MOD
-        DEBUG_MODE = 1;
-        
-        % predefined radius of each place cell
-        RADIUS_PC = 0.5;
-        
         % duration of one time step
         DELTA_T = 0.25;
         
         
-        %%% RING ATTRACTOR PARAMETERS %%%
-        % set stripe cell tuning
-        SIGMA_RING = 5;
+        
+        % DISPLAY MODE
+        % change that value to show only the environment (0), the
+        % environment together with the rate map of defined stripe cell (1)
+        % or the environment together with the rate map and all ring
+        % attractors (2). IMPORTANT: If displaying all ring attractors one
+        % should increase the number of phases to display e.g. [0:1/100:1]
+        DISPLAY_MODE = 1;
+        
+        % choose the stripe cell for that you want to record the activity
+        % in the environment (direction, scale, phase)
+        STRIPE_CELL = {9,3,1}
+
+        %%% STRIPE CELL TUNING PARAMETERS %%%
         % direction
         DIRECTIONS = [10:10:180];
         % number of phases to calculate for each ring attractor
-        %         PHASES = [0,1/5,2/5,3/5,4/5]
-        PHASES = [0:1/360:1]
+        PHASES = [0,1/5,2/5,3/5,4/5]
+%         PHASES = [0:1/100:1]
         % distance between two activity peaks
         SCALES = [20,35,50];
-        % Velocity , basically depending on Environment
-        VELOCITY = 6.25;
         
         
     end
@@ -55,6 +58,10 @@ classdef HPC < handle
         % stores the head direction
         hd;
         
+        agentPosition = [0 0];
+        
+        % Velocity of the agent (default 10)
+        agentVelocity = 10;
         
         % number of cells in each layer
         n;
@@ -66,6 +73,7 @@ classdef HPC < handle
         currentTime;
         
         %%% Testing grid cell model %%%
+        singleStripeCell =zeros(500)
         % value Dd of equation 2 (we have D_d value for each degree -> 360)
         direction_displacement = zeros(18,1)
         
@@ -76,13 +84,14 @@ classdef HPC < handle
         figureStripeCells1 =[];
         figureStripeCells2 =[];
         figureStripeCells3 =[];
+        figureStripeCellMap =[];
     end
     
     
     % Update the timestamp in each public method
     methods(Access=public)
         
-        function obj = HPC(n,sigma)
+        function obj = HPC(n,sigma,agentVelocity)
             % Constructor for RSC. Set number of cells for each layer and
             % corresponding sigma
             
@@ -90,6 +99,8 @@ classdef HPC < handle
             obj.n = n;
             % variance for each layer gaussian function
             obj.sigma = sigma;
+            
+            obj.agentVelocity = agentVelocity;
             
             obj.currentTime = 0.0;
             
@@ -110,9 +121,12 @@ classdef HPC < handle
             % set new head direction
             obj.hd = agentPose(3);
             
+            % set new agent position
+            obj.agentPosition = agentPose(1:2);
             
             % update the complete model
             obj.updateModel();
+            
             
             % receive tuning
             agdCells = obj.agdCells();
@@ -169,43 +183,60 @@ classdef HPC < handle
             %%% TESTING grid cell model %%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
-            % calculate displacement for one specific direction
-            % needs needs to be done for every direction?
+            % calculate displacement 
+            v_ds = cosd(obj.DIRECTIONS -obj.hd) *obj.agentVelocity * obj.DELTA_T;
+            obj.direction_displacement = obj.direction_displacement + v_ds';
             
-            for direction_index=1:length(obj.DIRECTIONS)
-                direction = obj.DIRECTIONS(direction_index);
-                % equation 1 from paper
-                v_d = cos(direction-obj.hd); %*obj.VELOCITY;
-                % equation 2 from paper
-                obj.direction_displacement(direction_index) = obj.direction_displacement(direction_index) + v_d;
-                
-                for scale_index=1:length(obj.SCALES)
-                    scale = obj.SCALES(scale_index);
-                    for phase_index= 1:length(obj.PHASES)
-                        phase = obj.PHASES(phase_index);
-                        % correct phase
-                        phase = phase * scale;
-                        
-                        % equation 3 from paper
-                        omega_dps = mod((obj.direction_displacement(direction_index) - phase) , scale);
-                        % equation 4 from paper
-                        obj.stripeCells(scale_index,direction_index,phase_index) = exp( - (min(omega_dps,scale-omega_dps)^2 / (2*(scale*0.07)^2)) );
-                        
-                    end
-                    
-                end
-                
+            % calculate omega
+            phases = obj.PHASES .* obj.SCALES';
+            tmp = bsxfun(@minus,obj.direction_displacement,permute(phases,[3 1 2]));
+            omega_dps = mod(tmp , obj.SCALES);
+            % calculate stripe cells activity
+            obj.stripeCells = exp( - (min(omega_dps,obj.SCALES-omega_dps).^2 ./ (2.*(obj.SCALES.*0.07).^2)) );
+            
+            
+            % calculate displacement
+%             for direction_index=1:length(obj.DIRECTIONS)
+%                 direction = obj.DIRECTIONS(direction_index);
+%                 % equation 1 from paper
+%                 v_d = cosd(direction-obj.hd) *obj.agentVelocity * obj.DELTA_T;
+%                 % equation 2 from paper
+%                 obj.direction_displacement(direction_index) = obj.direction_displacement(direction_index) + v_d;
+%                 
+%                 
+%                 % walk over all stripe cells 
+%                 for scale_index=1:length(obj.SCALES)
+%                     scale = obj.SCALES(scale_index);
+%                     for phase_index= 1:length(obj.PHASES)
+%                         phase = obj.PHASES(phase_index);
+%                         % correct phase
+%                         phase = phase * scale;
+%                         
+%                         % equation 3 from paper
+%                         omega_dps = mod((obj.direction_displacement(direction_index) - phase) , scale);
+%                         % equation 4 from paper
+%                         obj.stripeCells(scale_index,direction_index,phase_index) = exp( - (min(omega_dps,scale-omega_dps)^2 / (2*(scale*0.07)^2)) );
+%                         
+%                     end
+%                     
+%                 end
+%                 
+%             end
+            
+            
+            % store response of singel stripe cell
+            x = uint16(obj.agentPosition(1));
+            y = uint16(obj.agentPosition(2));
+            % make sure agent is within the environment
+            if x > 0 && y > 0 && x < 500 && y < 500
+                % create index 
+                indexMA = sub2ind(size(obj.stripeCells),obj.STRIPE_CELL{:});
+                obj.singleStripeCell(x,y) = obj.singleStripeCell(x,y) + obj.stripeCells(indexMA);
             end
             
             
-            
-            %
-            
-            % only show selected stripe cells 
-%             obj.stripeCells = reshape(obj.stripeCells(1,3,:),1,[]);
-            
             % Plot all Cell layers
-            if obj.DEBUG_MODE
+            if obj.DISPLAY_MODE
                 if obj.currentTime > 0
                     obj.updatePlotCells();
                 else
@@ -226,76 +257,66 @@ classdef HPC < handle
         function initializePlotCells(obj)
             
             
-%             hold on;
-%             
-%             subplot(5,4,[11 12 15 16 19 20])
-%             obj.figureStripeCells = plot([1:length(obj.stripeCells)],obj.stripeCells, 'r');
-%             
-%             obj.figureStripeCells.XDataSource = 'X_STRIPES';
-%             obj.figureStripeCells.YDataSource = 'Y_STRIPES';
-%             
-%             sNeg = {sprintf('0%c', char(176))};
-%             sNeg= [sNeg,sprintf('60%c', char(176))];
-%             sNeg= [sNeg,sprintf('120%c', char(176))];
-%             sNeg= [sNeg,sprintf('180%c', char(176))];
-%             sNeg= [sNeg,sprintf('240%c', char(176))];
-%             sNeg= [sNeg,sprintf('300%c', char(176))];
-%             sNeg= [sNeg,sprintf('360%c', char(176))];
-%             set(gca,'FontSize',13,'FontWeight','bold');
-%             
-%             set(gca,'XTickLabel',sNeg);
-%             set(gca,'XTick',[0,60,120,180,240,300,360]);
-%             set(gca,'YTickLabel',[]);
-%             ylabel('Ring Attractor Activity');
-%             xlabel('Phases (degree)');
-%             ylim([0 1]);
-%             title(sprintf('Stripe Cell Population Activity for scale %i and direction %i', obj.SCALES(1),obj.DIRECTIONS(3)));
-%             
-%             hold off;
-
-            hold on;
             
-            subplot(5,4,[11 12])
-           [x,y] = meshgrid(1:length(obj.PHASES),1:length(obj.DIRECTIONS));
-            z = obj.stripeCells(1,:,:);
-            z = squeeze(permute(z,[2,1,3]));
-            obj.figureStripeCells1  = pcolor(x,y,z);
-            set(gca,'FontSize',10,'FontWeight','bold');
-            set(gca,'XTick',[0,60,120,180,240,300,360]);
-            set(gca,'YTick',obj.DIRECTIONS(1:2:end)/10);
-            set(gca,'YTickLabel',obj.DIRECTIONS(1:2:end));
-            ylabel('Tuned Diretions');
-            title(sprintf('Stripe Cell Population Activity for scale %i ', obj.SCALES(1)));
-            hold off;
+            if obj.DISPLAY_MODE > 0
+                
+                hold on;
+                subplot(5,4,[ 15 16 19 20]);
+                obj.figureStripeCellMap= pcolor(obj.singleStripeCell');
+                set(obj.figureStripeCellMap, 'EdgeColor', 'none');
+                
+                hold off;
+                
+            end
             
-            hold on;
-            subplot(5,4,[15 16 ])
-           [x,y] = meshgrid(1:length(obj.PHASES),1:length(obj.DIRECTIONS));
-            z = obj.stripeCells(1,:,:);
-            z = squeeze(permute(z,[2,1,3]));
-            obj.figureStripeCells2  = pcolor(x,y,z);
-            set(gca,'FontSize',10,'FontWeight','bold');
-            set(gca,'XTick',[0,60,120,180,240,300,360]);
-            set(gca,'YTick',obj.DIRECTIONS(1:2:end)/10);
-            set(gca,'YTickLabel',obj.DIRECTIONS(1:2:end));
-            ylabel('Tuned Diretions');
-            title(sprintf('Stripe Cell Population Activity for scale %i', obj.SCALES(2)));
-            hold off;
-            
-            hold on;
-            subplot(5,4,[19 20 ])
-           [x,y] = meshgrid(1:length(obj.PHASES),1:length(obj.DIRECTIONS));
-            z = obj.stripeCells(1,:,:);
-            z = squeeze(permute(z,[2,1,3]));
-            obj.figureStripeCells3  = pcolor(x,y,z);
-            set(gca,'FontSize',10,'FontWeight','bold');
-            set(gca,'XTick',[0,60,120,180,240,300,360]);
-            set(gca,'YTick',obj.DIRECTIONS(1:2:end)/10);
-            set(gca,'YTickLabel',obj.DIRECTIONS(1:2:end));
-            ylabel('Tuned Diretions');
-            xlabel('Phases (degree)');
-            title(sprintf('Stripe Cell Population Activity for scale %i i', obj.SCALES(3)));
-            hold off;
+            if obj.DISPLAY_MODE > 1
+                
+                hold on;
+                subplot(5,4,[3 4 7 8])
+                
+                subplot(5,4,[3 4])
+                [x,y] = meshgrid(1:length(obj.PHASES),1:length(obj.DIRECTIONS));
+                z = obj.stripeCells(:,1,:);
+                z = squeeze(permute(z,[2,1,3]));
+                obj.figureStripeCells1  = pcolor(x,y,z);
+                set(gca,'FontSize',10,'FontWeight','bold');
+                set(gca,'XTick',[0,60,120,180,240,300,360]);
+                set(gca,'YTick',obj.DIRECTIONS(1:2:end)/10);
+                set(gca,'YTickLabel',obj.DIRECTIONS(1:2:end));
+                ylabel('Tuned Diretions');
+                title(sprintf('Stripe Cell Population Activity for scale %i ', obj.SCALES(1)));
+                hold off;
+                
+                hold on;
+                subplot(5,4,[7 8 ])
+                [x,y] = meshgrid(1:length(obj.PHASES),1:length(obj.DIRECTIONS));
+                z = obj.stripeCells(:,2,:);
+                z = squeeze(permute(z,[2,1,3]));
+                obj.figureStripeCells2  = pcolor(x,y,z);
+                set(gca,'FontSize',10,'FontWeight','bold');
+                set(gca,'XTick',[0,60,120,180,240,300,360]);
+                set(gca,'YTick',obj.DIRECTIONS(1:2:end)/10);
+                set(gca,'YTickLabel',obj.DIRECTIONS(1:2:end));
+                ylabel('Tuned Diretions');
+                title(sprintf('Stripe Cell Population Activity for scale %i', obj.SCALES(2)));
+                hold off;
+                
+                hold on;
+                subplot(5,4,[11 12 ])
+                [x,y] = meshgrid(1:length(obj.PHASES),1:length(obj.DIRECTIONS));
+                z = obj.stripeCells(:,3,:);
+                z = squeeze(permute(z,[2,1,3]));
+                obj.figureStripeCells3  = pcolor(x,y,z);
+                set(gca,'FontSize',10,'FontWeight','bold');
+                set(gca,'XTick',[0,60,120,180,240,300,360]);
+                set(gca,'YTick',obj.DIRECTIONS(1:2:end)/10);
+                set(gca,'YTickLabel',obj.DIRECTIONS(1:2:end));
+                ylabel('Tuned Diretions');
+                xlabel('Phases (degree)');
+                title(sprintf('Stripe Cell Population Activity for scale %i i', obj.SCALES(3)));
+                hold off;
+                
+            end
             
             
             
@@ -304,21 +325,35 @@ classdef HPC < handle
         
         function updatePlotCells(obj)
             % This function updates the plot
-            z = obj.stripeCells(1,:,:);
-            z = squeeze(permute(z,[2,1,3]));
-            set(obj.figureStripeCells1, 'CData', z); 
             
-            z = obj.stripeCells(2,:,:);
-            z = squeeze(permute(z,[2,1,3]));
-            set(obj.figureStripeCells2, 'CData', z); 
+            if obj.DISPLAY_MODE > 0
+                % update plot every 100 time steps
+                if mod(obj.currentTime,100) ==0
+                    
+                    
+                    set(obj.figureStripeCellMap,'CData',obj.singleStripeCell');
+                end
+            end
             
-            z = obj.stripeCells(3,:,:);
-            z = squeeze(permute(z,[2,1,3]));
-            set(obj.figureStripeCells3, 'CData', z); 
+            if obj.DISPLAY_MODE > 1
+                
+                z = obj.stripeCells(:,1,:);
+                z = squeeze(permute(z,[2,1,3]));
+                set(obj.figureStripeCells1, 'CData', z);
+                
+                z = obj.stripeCells(:,2,:);
+                z = squeeze(permute(z,[2,1,3]));
+                set(obj.figureStripeCells2, 'CData', z);
+                
+                z = obj.stripeCells(:,3,:);
+                z = squeeze(permute(z,[2,1,3]));
+                set(obj.figureStripeCells3, 'CData', z);
+                
+                
+            end
             
-            refreshdata(obj.figureStripeCells1,'caller');
-            refreshdata(obj.figureStripeCells2,'caller');
-            refreshdata(obj.figureStripeCells3,'caller');
+            refreshdata(obj.figureStripeCellMap,'caller');
+            
         end
         
     end

@@ -9,8 +9,7 @@ classdef Environment < handle
         % the line length for orientation line
         LINE_LENGTH = 15;
         
-        % speed to determine environment size somehow....
-        ENVI_VELOCITY = 10;
+
     end
     
     properties(Access=private)
@@ -23,6 +22,8 @@ classdef Environment < handle
         agentPosition = [0 0];
         % stores the current allocentric agent head direction in degrees
         agentOrientation = 0;
+        % speed of the agent (default 10)
+        agentVelocity = 10;
         % stores the current time
         currentTime = 0;
         % stores the complete path travelled so far
@@ -63,7 +64,7 @@ classdef Environment < handle
     
     methods(Access=public)
         
-        function obj = Environment(environmentSize,agentStartPosition,goal,cues,circledEnvironment)
+        function obj = Environment(environmentSize,agentStartPosition,agentVelocity,goal,cues,circledEnvironment)
             % Constructor of the environment class. It receives the size of the environment  [x,z] and agent information to initialize the environment
             % accordingly
             
@@ -73,6 +74,7 @@ classdef Environment < handle
             obj.agentPosition = agentStartPosition;
             obj.travelledPath = agentStartPosition;
             obj.agentOrientation = obj.MAIN_ORIENTATION;
+            obj.agentVelocity = agentVelocity;
             obj.goal = goal;
             obj.cues = cues;
             obj.circledEnvironment = circledEnvironment;
@@ -92,8 +94,8 @@ classdef Environment < handle
             
             % calculate new position using the calculated orientation and the predetermined velocity
             % of the agent
-            obj.agentPosition(1) = obj.agentPosition(1) +  obj.DELTA_T * obj.ENVI_VELOCITY * sin(orientation);
-            obj.agentPosition(2) = obj.agentPosition(2) +  obj.DELTA_T * obj.ENVI_VELOCITY * cos(orientation);
+            obj.agentPosition(1) = obj.agentPosition(1) +  obj.DELTA_T * obj.agentVelocity * sin(orientation);
+            obj.agentPosition(2) = obj.agentPosition(2) +  obj.DELTA_T * obj.agentVelocity * cos(orientation);
             
             % set agent orientation
             obj.agentOrientation = rad2deg(orientation);
