@@ -1,5 +1,7 @@
 # GridPlaceMap_Model
-This is a simple simulation of the GridPlaceMap Model described in the paper of _Pilly et. al 2012_
+This is a simple simulation of the GridPlaceMap Model described in the paper of _Pilly et. al 2012_.
+
+To execute the simulation just run the main.m file in matlab.
 
 The agent is located in a circular environment in which it has to navigate towards an activated cue. Once it reaches that cue the episode is over and another cue is choosen from a list. 
 
