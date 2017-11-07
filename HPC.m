@@ -19,7 +19,7 @@ classdef HPC < handle
         % or the environment together with the rate map and all ring
         % attractors (2). IMPORTANT: If displaying all ring attractors one
         % should increase the number of phases to display e.g. [0:1/100:1]
-        DISPLAY_MODE = 2;
+        DISPLAY_MODE = 1;
         
         % choose the stripe cell for that you want to record the activity
         % in the environment (direction, scale, phase)
@@ -29,11 +29,13 @@ classdef HPC < handle
         % direction
         DIRECTIONS = [10:10:180];
         % number of phases to calculate for each ring attractor
-        %         PHASES = [0,1/5,2/5,3/5,4/5]
-        PHASES = [0:1/100:1]
+        PHASES = [0,1/5,2/5,3/5,4/5]
+        %PHASES = [0:1/100:1]
         % distance between two activity peaks
         SCALES = [20,35,50];
         
+        % number of grid cells
+        GC_NUMBER = 10;
         
     end
     
@@ -49,8 +51,16 @@ classdef HPC < handle
         hdCells = [];
         
         % Stripe cells
-        stripeCells = []
+        stripeCells = [];
         
+        % grid cells
+        grid_cell = [];
+        
+        % output signal
+        G_output = [];
+        
+        % weights stripe cells to grid cells
+        w =[];
         
         % stores the goal direction (in degrees)
         goal = 0;
@@ -105,6 +115,14 @@ classdef HPC < handle
             obj.currentTime = 0.0;
             
             obj.prefDirection360 = [0:(360/obj.n):360-1];
+            
+            % initialize weigths stripe cells to grid cells
+            obj.w = rand(length(obj.DIRECTIONS),length(obj.SCALES),length(obj.PHASES),obj.GC_NUMBER)./10;
+            
+            % initialize grid cells with zeros??
+            obj.grid_cell = zeros(length(obj.SCALES),obj.GC_NUMBER);
+            
+            obj.G_output = zeros(obj.GC_NUMBER,length(obj.SCALES));
             
             
         end
@@ -180,7 +198,7 @@ classdef HPC < handle
             
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            %%% TESTING grid cell model %%%
+            %%% Stripe cell model       %%%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             % calculate displacement
@@ -195,44 +213,108 @@ classdef HPC < handle
             obj.stripeCells = exp( - (min(omega_dps,obj.SCALES-omega_dps).^2 ./ (2.*(obj.SCALES.*0.07).^2)) );
             
             
-            % calculate displacement
-            %             for direction_index=1:length(obj.DIRECTIONS)
-            %                 direction = obj.DIRECTIONS(direction_index);
-            %                 % equation 1 from paper
-            %                 v_d = cosd(direction-obj.hd) *obj.agentVelocity * obj.DELTA_T;
-            %                 % equation 2 from paper
-            %                 obj.direction_displacement(direction_index) = obj.direction_displacement(direction_index) + v_d;
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%% Grid cell model         %%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            %%% PARAMETERS %%%
+            % passive decay value
+            A = 10;
+            % feedforward excitatory input
+            alpha = 100;
+            % lateral inhibition
+            beta = 30;
+            % output threshold
+            gamma = 0.25;
+            % learning rate
+            lambda_w = 0.01;
+            
+            
+            
+            % sum over stripe cells x weights
+            sum_stripe_weights = squeeze(sum(sum(repmat(obj.stripeCells,1,1,1,obj.GC_NUMBER) .* obj.w,1),3))';
+            % sum over output signal G , but remove jth column
+            sum_g = squeeze(sum(repmat(obj.G_output,1,1,obj.GC_NUMBER),1))' - obj.G_output;
+            % calculate delta_g (equation 5)
+            delta_g = -A .* obj.grid_cell' + (1-obj.grid_cell') .* ( alpha .* sum_stripe_weights ) - obj.grid_cell' .* ( beta .* sum_g) ;
+            % integrate over delta_g x DELTA_T
+            obj.grid_cell = obj.grid_cell + delta_g' .* obj.DELTA_T;
+            
+            % calculate output signal G (equation 6)
+            obj.G_output = max(0,obj.grid_cell'-gamma) ./ (1-gamma);
+            
+            % sum over stripe cells directions
+            sum_stripe_cells =permute(squeeze(sum(repmat(obj.stripeCells,1,1,1,length(obj.DIRECTIONS)),1)),[3 1 2]) - obj.stripeCells;
+            % sum over stripe cells phases
+            sum_stripe_cells =permute(squeeze(sum(repmat(sum_stripe_cells,1,1,1,length(obj.PHASES)),3)),[1 2 3]) - sum_stripe_cells;
+            % calculate delta_w (equation 9)
+            delta_w = lambda_w .* permute(repmat(obj.G_output,1,1,length(obj.PHASES),length(obj.DIRECTIONS)),[4 2 3 1]) .* ( repmat(obj.stripeCells,1,1,1,obj.GC_NUMBER) - obj.w .* sum_stripe_cells);
+            % integrate over delta_w x DELTA_T
+            obj.w = obj.w + delta_w .* obj.DELTA_T;
+            
+            %             for scale=1:length(obj.SCALES)
+            %                 for gc_ind=1:obj.GC_NUMBER
             %
+            %                     % change of grid cell activity j of scale s (equation 5)
             %
-            %                 % walk over all stripe cells
-            %                 for scale_index=1:length(obj.SCALES)
-            %                     scale = obj.SCALES(scale_index);
-            %                     for phase_index= 1:length(obj.PHASES)
-            %                         phase = obj.PHASES(phase_index);
-            %                         % correct phase
-            %                         phase = phase * scale;
+            %                     % HELPER sum up stripe cell activity x weights
+            %                     sum_stripe_cells = sum(sum(squeeze(obj.stripeCells(:,scale,:) .* obj.w(:,scale,:,gc_ind))));
+            %                     g_js = obj.grid_cell(scale,gc_ind);
+            %                     delta_g_js = -A * g_js + (1-g_js) * (alpha * sum_stripe_cells) - g_js * (beta * sum(obj.G_output(1:end ~= gc_ind,scale)));
+            %                     obj.grid_cell(scale,gc_ind) = obj.grid_cell(scale,gc_ind) + delta_g_js * obj.DELTA_T;
+            %                     obj.G_output(gc_ind,scale) = max(0,obj.grid_cell(scale,gc_ind)-gamma) ./ (1-gamma);
+            %                 end
+            %             end
             %
-            %                         % equation 3 from paper
-            %                         omega_dps = mod((obj.direction_displacement(direction_index) - phase) , scale);
-            %                         % equation 4 from paper
-            %                         obj.stripeCells(scale_index,direction_index,phase_index) = exp( - (min(omega_dps,scale-omega_dps)^2 / (2*(scale*0.07)^2)) );
+            % %             obj.G_output = max(0,obj.grid_cell'-gamma) ./ (1-gamma);
             %
+            %             for scale=1:length(obj.SCALES)
+            %                 for gc_ind=1:obj.GC_NUMBER
+            %
+            %                     % weight update (equation 9)
+            %                     for i=1:length(obj.DIRECTIONS)
+            %                         for ii=1:length(obj.PHASES)
+            %
+            %                             sum_stripe_cells = sum(sum(obj.stripeCells(1:end ~= i,scale,1:end ~= ii)));
+            %
+            %                             delta_w = lambda_w * obj.G_output(gc_ind,scale) * ( obj.stripeCells(i,scale,ii) - obj.w(i,scale,ii,gc_ind) * sum_stripe_cells);
+            %
+            %                             obj.w(i,scale,ii,gc_ind) = obj.w(i,scale,ii,gc_ind) + delta_w * obj.DELTA_T;
+            %                         end
             %                     end
             %
             %                 end
-            %
             %             end
             
             
-            % store response of singel stripe cell
+            
+            %           obj.grid_cell = obj.grid_cell ./ max(obj.grid_cell) ;
+            
+            % calculate output signale
+            %
+            
+            %                         % store response of singel stripe cell
+            %                         x = uint16(obj.agentPosition(1));
+            %                         y = uint16(obj.agentPosition(2));
+            %                         % make sure agent is within the environment
+            %                         if x > 0 && y > 0 && x < 500 && y < 500
+            %                             % create index
+            %                             indexMA = sub2ind(size(obj.stripeCells),obj.STRIPE_CELL{:});
+            %                             obj.singleStripeCell(x,y) = obj.singleStripeCell(x,y) + obj.stripeCells(indexMA);
+            %                         end
+            
+            
+            
+            % store response of singel grid cell
             x = uint16(obj.agentPosition(1));
             y = uint16(obj.agentPosition(2));
             % make sure agent is within the environment
             if x > 0 && y > 0 && x < 500 && y < 500
                 % create index
-                indexMA = sub2ind(size(obj.stripeCells),obj.STRIPE_CELL{:});
-                obj.singleStripeCell(x,y) = obj.singleStripeCell(x,y) + obj.stripeCells(indexMA);
+                indexMA = sub2ind(size(obj.grid_cell),3,2);
+                obj.singleStripeCell(x,y) = obj.singleStripeCell(x,y) + obj.G_output(indexMA);
             end
+            
             
             
             % Plot all Cell layers

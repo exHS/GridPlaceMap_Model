@@ -2,7 +2,7 @@
 clear;
 close all;
 
-FAST_PLOTTING = 0;
+FAST_PLOTTING = 1;
 
 s = RandStream('mcg16807','Seed',25);
 RandStream.setGlobalStream(s);
